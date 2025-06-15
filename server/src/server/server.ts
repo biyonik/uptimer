@@ -1,24 +1,27 @@
 /**
- * Type-Safe Apollo Server Integration - Fixed Version
+ * Type-Safe Apollo Server Integration - Fixed Version with Logger
  *
  * TR: Express type version conflict'ini çözmek için type assertion ve
  *     interface extending kullanarak Apollo Server entegrasyonu.
+ *     Professional logging ile enhanced.
  *
  * EN: Apollo Server integration using type assertion and interface extending
  *     to resolve Express type version conflicts.
+ *     Enhanced with professional logging.
  */
 
 import * as http from "node:http";
-import { Express, Request as ExpressRequest, Response as ExpressResponse, NextFunction } from "express";
-import express from "express";
-import { ApolloServer, BaseContext } from "@apollo/server";
-import { expressMiddleware } from "@apollo/server/express4";
-import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHttpServer";
-import { ApolloServerPluginLandingPageLocalDefault } from "@apollo/server/plugin/landingPage/default";
-import { ApolloServerPluginLandingPageDisabled } from "@apollo/server/plugin/disabled";
-import { config } from "./config";
+import express, {Express, NextFunction, Request as ExpressRequest, Response as ExpressResponse} from "express";
+import {ApolloServer, BaseContext} from "@apollo/server";
+import {expressMiddleware} from "@apollo/server/express4";
+import {ApolloServerPluginDrainHttpServer} from "@apollo/server/plugin/drainHttpServer";
+import {ApolloServerPluginLandingPageLocalDefault} from "@apollo/server/plugin/landingPage/default";
+import {ApolloServerPluginLandingPageDisabled} from "@apollo/server/plugin/disabled";
+import {config} from "./config";
 import {graphqlHTTP} from "express-graphql";
 import {buildSchema} from "graphql/utilities";
+import cookieSession from "cookie-session";
+import logger, {graphqlLogger} from "./logger";
 
 /**
  * Custom Express Types - Type Conflict Fix
@@ -58,13 +61,13 @@ interface GraphQLContext extends BaseContext {
 }
 
 /**
- * MonitorServer Class - Apollo Server with Type Safety
+ * MonitorServer Class - Apollo Server with Type Safety and Professional Logging
  *
  * TR: Type-safe Apollo Server entegrasyonu ile HTTP sunucu yönetimi.
- *     Express type conflict'leri çözülmüş, production-ready.
+ *     Express type conflict'leri çözülmüş, professional logging eklenmiş, production-ready.
  *
  * EN: HTTP server management with type-safe Apollo Server integration.
- *     Express type conflicts resolved, production-ready.
+ *     Express type conflicts resolved, professional logging added, production-ready.
  */
 export default class MonitorServer {
     private readonly app: Express;
@@ -90,7 +93,7 @@ export default class MonitorServer {
      *     Version conflicts resolved, clean implementation.
      */
     private createApolloServer(): ApolloServer<GraphQLContext> {
-        console.log('🚀 Creating Apollo Server...');
+        logger.info('🚀 Creating Apollo Server...');
 
         // TR: Geçici GraphQL Schema - real schema buraya gelecek
         // EN: Temporary GraphQL Schema - real schema will come here
@@ -136,7 +139,7 @@ export default class MonitorServer {
             },
 
             Mutation: {
-                echo: (_: any, { message }: { message: string }): string => {
+                echo: (_: any, {message}: { message: string }): string => {
                     return `Echo: ${message}`;
                 }
             }
@@ -144,14 +147,13 @@ export default class MonitorServer {
 
         this.graphqlSchema = buildSchema(typeDefs);
 
-
         return new ApolloServer<GraphQLContext>({
             typeDefs,
             resolvers,
             plugins: [
                 // TR: HTTP server drain plugin
                 // EN: HTTP server drain plugin
-                ApolloServerPluginDrainHttpServer({ httpServer: this.httpServer }),
+                ApolloServerPluginDrainHttpServer({httpServer: this.httpServer}),
 
                 // TR: Development'ta GraphQL Playground
                 // EN: GraphQL Playground in development
@@ -170,20 +172,24 @@ export default class MonitorServer {
             cache: config.isProduction ? 'bounded' : undefined,
             introspection: config.isDevelopment,
 
-            // TR: Error formatting - production safe
-            // EN: Error formatting - production safe
+            // TR: Error formatting - production safe with professional logging
+            // EN: Error formatting - production safe with professional logging
             formatError: (error) => {
-                console.error('GraphQL Error:', error);
-
                 if (config.isProduction) {
-                    return {
+                    graphqlLogger.error('GraphQL Error:', {
                         message: error.message,
-                        code: error.extensions?.code || 'INTERNAL_ERROR',
+                        code: error.extensions?.code,
                         path: error.path
-                    };
+                    });
+                } else {
+                    graphqlLogger.debug('GraphQL Error:', {error});
                 }
 
-                return error;
+                return config.isProduction ? {
+                    message: error.message,
+                    code: error.extensions?.code || 'INTERNAL_ERROR',
+                    path: error.path
+                } : error;
             }
         });
     }
@@ -220,10 +226,10 @@ export default class MonitorServer {
                 const token = authHeader.substring(7);
                 // TR: JWT verification buraya gelecek
                 // EN: JWT verification will come here
-                console.log('🔐 JWT token detected:', token.substring(0, 10) + '...');
+                logger.debug('🔐 JWT token detected', {tokenPreview: token.substring(0, 10) + '...'});
                 // context.user = await verifyJWTToken(token);
             } catch (error) {
-                console.warn('⚠️ Invalid JWT token');
+                logger.warn('⚠️ Invalid JWT token', {error});
             }
         }
 
@@ -246,7 +252,7 @@ export default class MonitorServer {
      */
     async start(): Promise<void> {
         try {
-            console.log('🚀 Starting server with Apollo GraphQL...');
+            logger.info('🚀 Starting server with Apollo GraphQL...');
 
             // TR: 1. Apollo Server'ı başlat (önce başlatılmalı!)
             // EN: 1. Start Apollo Server (must be started first!)
@@ -269,7 +275,7 @@ export default class MonitorServer {
             await this.startHttpServer();
 
         } catch (error) {
-            console.error('❌ Failed to start server:', error);
+            logger.error('❌ Failed to start server:', {error});
             throw error;
         }
     }
@@ -281,14 +287,14 @@ export default class MonitorServer {
      * EN: Safely starts Apollo Server.
      */
     private async startApolloServer(): Promise<void> {
-        console.log('📡 Starting Apollo Server...');
+        logger.info('📡 Starting Apollo Server...');
 
         try {
             await this.apolloServer.start();
-            console.log('✅ Apollo Server started successfully');
+            logger.info('✅ Apollo Server started successfully');
 
         } catch (error) {
-            console.error('❌ Apollo Server startup failed:', error);
+            logger.error('❌ Apollo Server startup failed:', {error});
             throw new Error(`Apollo Server startup error: ${error}`);
         }
     }
@@ -303,7 +309,7 @@ export default class MonitorServer {
      *     Express compatibility ensured using type assertions.
      */
     private async applyGraphQLMiddleware(): Promise<void> {
-        console.log('🔗 Applying GraphQL middleware...');
+        logger.info('🔗 Applying GraphQL middleware...');
 
         try {
             // TR: CORS middleware önce
@@ -331,19 +337,20 @@ export default class MonitorServer {
                     schema: this.graphqlSchema,
                     graphiql: true
                 }));
+                logger.debug('🎮 GraphiQL interface enabled for development');
             }
 
             // TR: Apollo Server middleware - TYPE-SAFE VERSION
             // EN: Apollo Server middleware - TYPE-SAFE VERSION
             this.app.use(
                 '/graphql',
-                express.json({ limit: '50mb' }), // TR: GraphQL için JSON parsing | EN: JSON parsing for GraphQL
-                express.urlencoded({ extended: true, limit: '50mb' }),
+                express.json({limit: '50mb'}), // TR: GraphQL için JSON parsing | EN: JSON parsing for GraphQL
+                express.urlencoded({extended: true, limit: '50mb'}),
 
                 // TR: Type-safe expressMiddleware
                 // EN: Type-safe expressMiddleware
                 expressMiddleware(this.apolloServer, {
-                    context: async ({ req, res }): Promise<GraphQLContext> => {
+                    context: async ({req, res}): Promise<GraphQLContext> => {
                         // TR: Type assertion ile compatibility sağla
                         // EN: Ensure compatibility with type assertion
                         return this.createGraphQLContext({
@@ -354,34 +361,51 @@ export default class MonitorServer {
                 }) as any // TR: Type assertion - conflict'i çözer | EN: Type assertion - resolves conflict
             );
 
-            console.log('✅ GraphQL middleware applied successfully');
-            console.log(`🔗 GraphQL endpoint: /graphql`);
+            logger.info('✅ GraphQL middleware applied successfully');
+            logger.info(`🔗 GraphQL endpoint: /graphql`);
 
             if (config.isDevelopment) {
-                console.log(`🎮 GraphQL Playground: http://localhost:${config.PORT}/graphql`);
+                logger.info(`🎮 GraphQL Playground: http://localhost:${config.PORT}/graphql`);
             }
 
         } catch (error) {
-            console.error('❌ GraphQL middleware setup failed:', error);
+            logger.error('❌ GraphQL middleware setup failed:', {error});
             throw new Error(`GraphQL middleware error: ${error}`);
         }
     }
 
     /**
-     * applyStandardMiddleware() - Standard Express Middleware - FIXED ORDER
+     * applyStandardMiddleware() - Standard Express Middleware with Professional Logging
      *
-     * TR: Standart Express middleware'lerini uygular. 404 handler'ı ÇIKARILDI.
-     *     GraphQL middleware'den SONRA eklenecek.
+     * TR: Standart Express middleware'lerini uygular. Professional logging ile enhanced.
+     *     404 handler'ı ÇIKARILDI, GraphQL middleware'den SONRA eklenecek.
      *
-     * EN: Applies standard Express middlewares. 404 handler REMOVED.
-     *     Will be added AFTER GraphQL middleware.
+     * EN: Applies standard Express middlewares. Enhanced with professional logging.
+     *     404 handler REMOVED, will be added AFTER GraphQL middleware.
      */
     private applyStandardMiddleware(): void {
         // TR: Proxy settings
         // EN: Proxy settings
         this.app.set('trust proxy', 1);
 
-        // TR: Security headers
+        // TR: Cookie session ara katmanı
+        // EN: Cookie session middleware
+        this.app.use(cookieSession({
+            name: 'session', // TR: Session cookie adı | EN: Session cookie name
+            keys: [config.jwt.secretKeyOne, config.jwt.secretKeyTwo], // TR: Secret key'ler | EN: Secret keys
+            maxAge: 24 * 7 * 60 * 60 * 1000, // TR: 1 hafta | EN: 1 week
+            secure: !config.isDevelopment, // TR: Production'da secure | EN: Secure in production
+            ...(!config.isDevelopment && {
+                sameSite: 'none'
+            })
+        }));
+
+        logger.debug('🍪 Cookie session middleware configured', {
+            secure: !config.isDevelopment,
+            maxAge: '7 days'
+        });
+
+        // TR: Güvenlik başlıkları
         // EN: Security headers
         this.app.use((_req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
             res.header('X-Content-Type-Options', 'nosniff');
@@ -390,19 +414,24 @@ export default class MonitorServer {
             next();
         });
 
-        // TR: Request logging (development)
+        // TR: İstek loglama (development)
         // EN: Request logging (development)
         if (config.isDevelopment) {
             this.app.use((req: ExpressRequest, _res: ExpressResponse, next: NextFunction) => {
-                console.log(`📝 ${req.method} ${req.path} - ${new Date().toISOString()}`);
+                logger.debug(`📝 ${req.method} ${req.path}`, {
+                    method: req.method,
+                    path: req.path,
+                    userAgent: req.get('User-Agent'),
+                    ip: req.ip
+                });
                 next();
             });
         }
 
-        // TR: Main routes
+        // TR: Ana rotalar
         // EN: Main routes
         this.app.get('/', (_req: ExpressRequest, res: ExpressResponse) => {
-            res.json({
+            const responseData = {
                 message: 'GraphQL + Next.js API Server',
                 status: 'running',
                 environment: config.NODE_ENV,
@@ -413,55 +442,67 @@ export default class MonitorServer {
                     health: '/health'
                 },
                 version: '1.0.0'
-            });
+            };
+
+            logger.debug('📊 API status requested', {responseData});
+            res.json(responseData);
         });
 
         // TR: Health check
         // EN: Health check
         this.app.get('/health', (_req: ExpressRequest, res: ExpressResponse) => {
-            res.json({
+            const healthData = {
                 status: 'healthy',
                 timestamp: new Date().toISOString(),
                 ...this.getServerInfo()
-            });
+            };
+
+            logger.debug('❤️ Health check requested', {healthData});
+            res.json(healthData);
         });
 
-        // TR: 404 handler ÇIKARILDI - GraphQL middleware'den sonra eklenecek
-        // EN: 404 handler REMOVED - will be added after GraphQL middleware
-
-        console.log('✅ Standard middleware applied');
+        logger.info('✅ Standard middleware applied');
     }
 
     /**
-     * apply404Handler() - 404 Handler Ayrı Metod
+     * apply404Handler() - 404 Handler with Professional Logging
      *
-     * TR: 404 handler'ı ayrı metod olarak tanımlıyoruz.
+     * TR: 404 handler'ı ayrı metod olarak tanımlanır. Professional logging ile enhanced.
      *     GraphQL middleware'den SONRA çağrılacak.
      *
-     * EN: 404 handler as separate method.
+     * EN: 404 handler as separate method. Enhanced with professional logging.
      *     Will be called AFTER GraphQL middleware.
      */
     private apply404Handler(): void {
         // TR: 404 handler - TÜM route'lardan ve middleware'lerden SONRA
         // EN: 404 handler - AFTER all routes and middlewares
         this.app.use((req: ExpressRequest, res: ExpressResponse) => {
-            res.status(404).json({
+            const notFoundData = {
                 error: 'Route not found',
                 path: req.originalUrl,
                 method: req.method,
                 timestamp: new Date().toISOString(),
                 availableEndpoints: ['/', '/health', '/graphql']
+            };
+
+            logger.warn('🔍 404 - Route not found', {
+                method: req.method,
+                path: req.originalUrl,
+                userAgent: req.get('User-Agent'),
+                ip: req.ip
             });
+
+            res.status(404).json(notFoundData);
         });
 
-        console.log('✅ 404 handler applied');
+        logger.info('✅ 404 handler applied');
     }
 
     /**
-     * startHttpServer() - HTTP Server Startup
+     * startHttpServer() - HTTP Server Startup with Professional Logging
      *
-     * TR: HTTP sunucusunu başlatır.
-     * EN: Starts HTTP server.
+     * TR: HTTP sunucusunu başlatır. Professional logging ile enhanced.
+     * EN: Starts HTTP server. Enhanced with professional logging.
      */
     private async startHttpServer(): Promise<void> {
         return new Promise((resolve, reject) => {
@@ -469,25 +510,30 @@ export default class MonitorServer {
 
             this.httpServer.on('error', (error: NodeJS.ErrnoException) => {
                 if (error.code === 'EADDRINUSE') {
-                    console.error(`❌ Port ${SERVER_PORT} is already in use`);
+                    logger.error(`❌ Port ${SERVER_PORT} is already in use`, {port: SERVER_PORT, code: error.code});
+                } else if (error.code === 'EACCES') {
+                    logger.error(`❌ Permission denied to bind to port ${SERVER_PORT}`, {
+                        port: SERVER_PORT,
+                        code: error.code
+                    });
                 } else {
-                    console.error('❌ Server error:', error);
+                    logger.error('❌ Server error:', {error, port: SERVER_PORT});
                 }
                 reject(error);
             });
 
             this.httpServer.listen(SERVER_PORT, () => {
-                console.log(`🚀 Server started successfully`);
-                console.log(`📊 Environment: ${config.NODE_ENV}`);
-                console.log(`🌐 Port: ${SERVER_PORT}`);
-                console.log(`🔧 Process ID: ${process.pid}`);
+                logger.info(`🚀 Server started successfully`);
+                logger.info(`📊 Environment: ${config.NODE_ENV}`);
+                logger.info(`🌐 Port: ${SERVER_PORT}`);
+                logger.info(`🔧 Process ID: ${process.pid}`);
 
                 if (config.isDevelopment) {
-                    console.log(`\n🔗 Available endpoints:`);
-                    console.log(`   • REST API: http://localhost:${SERVER_PORT}/`);
-                    console.log(`   • Health: http://localhost:${SERVER_PORT}/health`);
-                    console.log(`   • GraphQL: http://localhost:${SERVER_PORT}/graphql`);
-                    console.log(`   • Playground: http://localhost:${SERVER_PORT}/graphql\n`);
+                    logger.info(`\n🔗 Available endpoints:`);
+                    logger.info(`   • REST API: http://localhost:${SERVER_PORT}/`);
+                    logger.info(`   • Health: http://localhost:${SERVER_PORT}/health`);
+                    logger.info(`   • GraphQL: http://localhost:${SERVER_PORT}/graphql`);
+                    logger.info(`   • Playground: http://localhost:${SERVER_PORT}/graphql\n`);
                 }
 
                 resolve();
@@ -496,39 +542,45 @@ export default class MonitorServer {
     }
 
     /**
-     * stop() - Graceful Server Shutdown
+     * stop() - Graceful Server Shutdown with Professional Logging
      *
-     * TR: Sunucuyu güvenli şekilde kapatır.
-     * EN: Safely shuts down the server.
+     * TR: Sunucuyu güvenli şekilde kapatır. Professional logging ile enhanced.
+     * EN: Safely shuts down the server. Enhanced with professional logging.
      */
     async stop(): Promise<void> {
-        if (this.isShuttingDown) return;
+        if (this.isShuttingDown) {
+            logger.warn('⚠️ Server is already shutting down...');
+            return;
+        }
 
         this.isShuttingDown = true;
-        console.log('🔄 Gracefully shutting down server...');
+        logger.info('🔄 Gracefully shutting down server...');
 
         try {
             await this.apolloServer.stop();
-            console.log('✅ Apollo Server stopped');
+            logger.info('✅ Apollo Server stopped');
 
             await new Promise<void>((resolve, reject) => {
                 this.httpServer.close((error) => {
                     if (error) {
+                        logger.error('❌ Error during HTTP server shutdown:', {error});
                         reject(error);
                     } else {
-                        console.log('✅ HTTP server stopped');
+                        logger.info('✅ HTTP server stopped');
                         resolve();
                     }
                 });
 
                 setTimeout(() => {
-                    console.log('⚠️ Force closing server...');
+                    logger.warn('⚠️ Force closing server after timeout...');
                     resolve();
                 }, 10000);
             });
 
+            logger.info('✅ Server shutdown completed successfully');
+
         } catch (error) {
-            console.error('❌ Error during shutdown:', error);
+            logger.error('❌ Error during shutdown:', {error});
             throw error;
         }
     }
@@ -556,32 +608,36 @@ export default class MonitorServer {
     }
 
     /**
-     * setupGracefulShutdown() - Graceful Shutdown Setup
+     * setupGracefulShutdown() - Graceful Shutdown Setup with Professional Logging
      *
-     * TR: Graceful shutdown signal handler'larını kurar.
-     * EN: Sets up graceful shutdown signal handlers.
+     * TR: Graceful shutdown signal handler'larını kurar. Professional logging ile enhanced.
+     * EN: Sets up graceful shutdown signal handlers. Enhanced with professional logging.
      */
     private setupGracefulShutdown(): void {
         const shutdownHandler = async (signal: string) => {
-            console.log(`\n📡 Received ${signal}, starting graceful shutdown...`);
+            logger.info(`\n📡 Received ${signal}, starting graceful shutdown...`, {signal});
             try {
                 await this.stop();
                 process.exit(0);
             } catch (error) {
-                console.error('❌ Error during shutdown:', error);
+                logger.error('❌ Error during shutdown:', {error, signal});
                 process.exit(1);
             }
         };
 
         process.on('SIGTERM', () => shutdownHandler('SIGTERM'));
         process.on('SIGINT', () => shutdownHandler('SIGINT'));
+
         process.on('uncaughtException', (error) => {
-            console.error('❌ Uncaught Exception:', error);
+            logger.fatal('❌ Uncaught Exception:', {error});
             shutdownHandler('uncaughtException');
         });
-        process.on('unhandledRejection', (reason, _promise) => {
-            console.error('❌ Unhandled Rejection:', reason);
+
+        process.on('unhandledRejection', (reason, promise) => {
+            logger.error('❌ Unhandled Rejection:', {reason, promise});
             shutdownHandler('unhandledRejection');
         });
+
+        logger.debug('🛡️ Graceful shutdown handlers configured');
     }
 }

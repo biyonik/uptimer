@@ -15,6 +15,7 @@ import express, { Express } from 'express';
 import MonitorServer from './server/server';
 import { config, validateConfig } from './server/config';
 import { connectDatabase, syncDatabase, closeDatabase } from './server/database';
+import logger from './server/logger';
 
 /**
  * ApplicationBootstrap Sınıfı - GraphQL + Express Integration
@@ -110,14 +111,14 @@ class ApplicationBootstrap {
         // TR: Çift başlatmayı önle
         // EN: Prevent double initialization
         if (this.isInitialized) {
-            console.warn('⚠️ Application is already initialized');
+            logger.warn('⚠️ Application is already initialized');
             return;
         }
 
         try {
             const startTime = Date.now();
-            console.log('🚀 STARTING GRAPHQL + EXPRESS APPLICATION...');
-            console.log('==============================================');
+            logger.info('🚀 STARTING GRAPHQL + EXPRESS APPLICATION...');
+            logger.info('==============================================');
 
             // TR: 1. Konfigürasyon Validasyonu
             // EN: 1. Configuration Validation
@@ -142,7 +143,7 @@ class ApplicationBootstrap {
             this.logSuccessfulStartup(elapsedTime);
 
         } catch (error) {
-            console.error('❌ GraphQL + Express application bootstrap failed:', error);
+            logger.error('❌ GraphQL + Express application bootstrap failed:', { error });
             await this.handleBootstrapError(error);
         }
     }
@@ -157,22 +158,22 @@ class ApplicationBootstrap {
      *     Checks GraphQL endpoint, CORS, JWT secret and other settings.
      */
     private async validateConfiguration(): Promise<void> {
-        console.log('🔧 Validating GraphQL + Express configuration...');
+        logger.info('🔧 Validating GraphQL + Express configuration...');
 
         try {
             // TR: Zod ile environment validation
             // EN: Environment validation with Zod
             validateConfig();
 
-            console.log('✅ Configuration validation successful');
-            console.log(`📊 Environment: ${config.NODE_ENV}`);
-            console.log(`🌐 HTTP Port: ${config.PORT}`);
-            console.log(`🔗 GraphQL Endpoint: /graphql`);
-            console.log(`🎮 GraphQL Playground: ${config.isDevelopment ? 'enabled' : 'disabled'}`);
-            console.log(`🌍 CORS Origin: ${config.client.corsOrigin}`);
+            logger.info('✅ Configuration validation successful');
+            logger.info(`📊 Environment: ${config.NODE_ENV}`);
+            logger.info(`🌐 HTTP Port: ${config.PORT}`);
+            logger.info(`🔗 GraphQL Endpoint: /graphql`);
+            logger.info(`🎮 GraphQL Playground: ${config.isDevelopment ? 'enabled' : 'disabled'}`);
+            logger.info(`🌍 CORS Origin: ${config.client.corsOrigin}`);
 
         } catch (error) {
-            console.error('❌ Configuration validation failed:', error);
+            logger.error('❌ Configuration validation failed:', { error });
             throw new Error(`Configuration validation error: ${error}`);
         }
     }
@@ -187,7 +188,7 @@ class ApplicationBootstrap {
      *     Prepares database connection that GraphQL resolvers will use.
      */
     private async setupDatabase(): Promise<void> {
-        console.log('🗄️ Setting up database for GraphQL + Express...');
+        logger.info('🗄️ Setting up database for GraphQL + Express...');
 
         try {
             // TR: Database bağlantısını test et
@@ -197,17 +198,17 @@ class ApplicationBootstrap {
             // TR: GraphQL için model synchronization
             // EN: Model synchronization for GraphQL
             if (config.isDevelopment) {
-                console.log('🔄 Synchronizing database models for GraphQL (development mode)...');
+                logger.info('🔄 Synchronizing database models for GraphQL (development mode)...');
                 await syncDatabase({ alter: true });
             } else if (config.NODE_ENV === 'production') {
-                console.log('🔒 Running safe database sync for production GraphQL...');
+                logger.info('🔒 Running safe database sync for production GraphQL...');
                 await syncDatabase({ alter: false, force: false });
             }
 
-            console.log('✅ Database setup completed for GraphQL resolvers');
+            logger.info('✅ Database setup completed for GraphQL resolvers');
 
         } catch (error) {
-            console.error('❌ Database setup failed:', error);
+            logger.error('❌ Database setup failed:', { error });
             throw new Error(`Database setup error: ${error}`);
         }
     }
@@ -223,7 +224,7 @@ class ApplicationBootstrap {
      *     Validates existence of necessary GraphQL assets before Apollo Server startup.
      */
     private async checkGraphQLReadiness(): Promise<void> {
-        console.log('📡 Checking GraphQL schema readiness...');
+        logger.info('📡 Checking GraphQL schema readiness...');
 
         try {
             // TR: GraphQL schema dosyalarının varlığını kontrol et
@@ -231,9 +232,9 @@ class ApplicationBootstrap {
 
             // TR: Şu an için basic check - gelecekte schema validation eklenebilir
             // EN: Basic check for now - schema validation can be added in future
-            console.log('📋 GraphQL TypeDefs: Ready (embedded)');
-            console.log('⚙️ GraphQL Resolvers: Ready (embedded)');
-            console.log('🔌 GraphQL Context: Ready (authentication + database)');
+            logger.debug('📋 GraphQL TypeDefs: Ready (embedded)');
+            logger.debug('⚙️ GraphQL Resolvers: Ready (embedded)');
+            logger.debug('🔌 GraphQL Context: Ready (authentication + database)');
 
             // TR: Gelecekte buraya eklenebilir:
             // EN: Can be added in future:
@@ -242,10 +243,10 @@ class ApplicationBootstrap {
             // - Custom directive validation
             // - Plugin configuration check
 
-            console.log('✅ GraphQL schema readiness check passed');
+            logger.info('✅ GraphQL schema readiness check passed');
 
         } catch (error) {
-            console.error('❌ GraphQL readiness check failed:', error);
+            logger.error('❌ GraphQL readiness check failed:', { error });
             throw new Error(`GraphQL readiness error: ${error}`);
         }
     }
@@ -262,7 +263,7 @@ class ApplicationBootstrap {
      *     HTTP server are started sequentially.
      */
     private async startFullStackServer(): Promise<void> {
-        console.log('🌐 Starting Full-Stack Server (GraphQL + Express + HTTP)...');
+        logger.info('🌐 Starting Full-Stack Server (GraphQL + Express + HTTP)...');
 
         try {
             // TR: MonitorServer.start() artık şunları yapıyor:
@@ -273,10 +274,10 @@ class ApplicationBootstrap {
             // 4. HTTP server startup
             await this.monitorServer.start();
 
-            console.log('✅ Full-Stack server started successfully');
+            logger.info('✅ Full-Stack server started successfully');
 
         } catch (error) {
-            console.error('❌ Full-Stack server startup failed:', error);
+            logger.error('❌ Full-Stack server startup failed:', { error });
             throw new Error(`Full-Stack server startup error: ${error}`);
         }
     }
@@ -295,36 +296,36 @@ class ApplicationBootstrap {
     private logSuccessfulStartup(elapsedTime: number): void {
         const serverInfo = this.monitorServer.getServerInfo();
 
-        console.log('\n🎉 GRAPHQL + EXPRESS APPLICATION STARTUP SUCCESSFUL!');
-        console.log('=====================================================');
-        console.log(`📊 Environment: ${serverInfo.environment}`);
-        console.log(`🌐 HTTP Port: ${serverInfo.port}`);
-        console.log(`🔧 Process ID: ${serverInfo.pid}`);
-        console.log(`⚡ Startup Time: ${elapsedTime}ms`);
-        console.log(`⏱️ Started At: ${new Date().toISOString()}`);
-        console.log('\n🔗 Available Endpoints:');
-        console.log(`   • 🏠 REST API Status: http://localhost:${serverInfo.port}/`);
-        console.log(`   • ❤️ Health Check: http://localhost:${serverInfo.port}/health`);
-        console.log(`   • 🚀 GraphQL API: http://localhost:${serverInfo.port}/graphql`);
+        logger.info('\n🎉 GRAPHQL + EXPRESS APPLICATION STARTUP SUCCESSFUL!');
+        logger.info('=====================================================');
+        logger.info(`📊 Environment: ${serverInfo.environment}`);
+        logger.info(`🌐 HTTP Port: ${serverInfo.port}`);
+        logger.info(`🔧 Process ID: ${serverInfo.pid}`);
+        logger.info(`⚡ Startup Time: ${elapsedTime}ms`);
+        logger.info(`⏱️ Started At: ${new Date().toISOString()}`);
+        logger.info('\n🔗 Available Endpoints:');
+        logger.info(`   • 🏠 REST API Status: http://localhost:${serverInfo.port}/`);
+        logger.info(`   • ❤️ Health Check: http://localhost:${serverInfo.port}/health`);
+        logger.info(`   • 🚀 GraphQL API: http://localhost:${serverInfo.port}/graphql`);
 
         if (config.isDevelopment) {
-            console.log(`   • 🎮 GraphQL Playground: http://localhost:${serverInfo.port}/graphql`);
-            console.log('\n📋 Development Features:');
-            console.log(`   • GraphQL Introspection: ✅ Enabled`);
-            console.log(`   • Request Logging: ✅ Enabled`);
-            console.log(`   • Error Stack Traces: ✅ Enabled`);
+            logger.info(`   • 🎮 GraphQL Playground: http://localhost:${serverInfo.port}/graphql`);
+            logger.info('\n📋 Development Features:');
+            logger.info(`   • GraphQL Introspection: ✅ Enabled`);
+            logger.info(`   • Request Logging: ✅ Enabled`);
+            logger.info(`   • Error Stack Traces: ✅ Enabled`);
         } else {
-            console.log('\n🔒 Production Features:');
-            console.log(`   • GraphQL Introspection: ❌ Disabled`);
-            console.log(`   • Error Masking: ✅ Enabled`);
-            console.log(`   • Query Caching: ✅ Enabled`);
+            logger.info('\n🔒 Production Features:');
+            logger.info(`   • GraphQL Introspection: ❌ Disabled`);
+            logger.info(`   • Error Masking: ✅ Enabled`);
+            logger.info(`   • Query Caching: ✅ Enabled`);
         }
 
-        console.log('\n🧪 Test GraphQL Query:');
-        console.log(`curl -X POST http://localhost:${serverInfo.port}/graphql \\`);
-        console.log(`  -H "Content-Type: application/json" \\`);
-        console.log(`  -d '{"query":"{ hello serverInfo { status uptime } }"}'`);
-        console.log('=====================================================\n');
+        logger.info('\n🧪 Test GraphQL Query:');
+        logger.info(`curl -X POST http://localhost:${serverInfo.port}/graphql \\`);
+        logger.info(`  -H "Content-Type: application/json" \\`);
+        logger.info(`  -d '{"query":"{ hello serverInfo { status uptime } }"}'`);
+        logger.info('=====================================================\n');
     }
 
     /**
@@ -339,27 +340,27 @@ class ApplicationBootstrap {
      * @param error - TR: Oluşan hata | EN: Error that occurred
      */
     private async handleBootstrapError(error: any): Promise<void> {
-        console.error('\n💥 GRAPHQL + EXPRESS BOOTSTRAP ERROR - CLEANING UP...');
-        console.error('===================================================');
-        console.error('Error details:', error);
+        logger.error('\n💥 GRAPHQL + EXPRESS BOOTSTRAP ERROR - CLEANING UP...');
+        logger.error('===================================================');
+        logger.error('Error details:', { error });
 
         try {
             // TR: 1. Database bağlantısını kapat
             // EN: 1. Close database connection
-            console.log('🗄️ Closing database connection...');
+            logger.info('🗄️ Closing database connection...');
             await closeDatabase();
 
             // TR: 2. MonitorServer'ı durdur (Apollo + HTTP server dahil)
             // EN: 2. Stop MonitorServer (including Apollo + HTTP server)
             if (this.monitorServer) {
-                console.log('🌐 Stopping Full-Stack server (Apollo + Express + HTTP)...');
+                logger.info('🌐 Stopping Full-Stack server (Apollo + Express + HTTP)...');
                 await this.monitorServer.stop();
             }
 
         } catch (cleanupError) {
-            console.error('❌ Error during cleanup:', cleanupError);
+            logger.error('❌ Error during cleanup:', { cleanupError });
         } finally {
-            console.log('💀 GraphQL + Express application terminated due to startup failure');
+            logger.fatal('💀 GraphQL + Express application terminated due to startup failure');
             process.exit(1); // TR: Hata kodu ile çık | EN: Exit with error code
         }
     }
@@ -376,24 +377,24 @@ class ApplicationBootstrap {
      *     Can be called from external signal handlers.
      */
     public async gracefulShutdown(): Promise<void> {
-        console.log('\n🔄 Starting graceful shutdown of GraphQL + Express application...');
+        logger.info('\n🔄 Starting graceful shutdown of GraphQL + Express application...');
 
         try {
             // TR: 1. MonitorServer'ı durdur (Apollo Server + HTTP)
             // EN: 1. Stop MonitorServer (Apollo Server + HTTP)
-            console.log('📡 Stopping Apollo GraphQL Server...');
+            logger.info('📡 Stopping Apollo GraphQL Server...');
             await this.monitorServer.stop();
 
             // TR: 2. Database bağlantısını kapat
             // EN: 2. Close database connection
-            console.log('🗄️ Closing database connection...');
+            logger.info('🗄️ Closing database connection...');
             await closeDatabase();
 
-            console.log('✅ GraphQL + Express application graceful shutdown completed');
+            logger.info('✅ GraphQL + Express application graceful shutdown completed');
             process.exit(0);
 
         } catch (error) {
-            console.error('❌ Error during graceful shutdown:', error);
+            logger.error('❌ Error during graceful shutdown:', { error });
             process.exit(1);
         }
     }
@@ -417,11 +418,11 @@ const initializeApp = async (): Promise<void> => {
         // EN: Record startup time
         const startTime = Date.now();
 
-        console.log('🚀 INITIALIZING GRAPHQL + EXPRESS APPLICATION...');
-        console.log('===============================================');
-        console.log(`🕒 Startup initiated at: ${new Date().toISOString()}`);
-        console.log(`🎯 Target: Full-Stack GraphQL API Server`);
-        console.log(`📦 Stack: Apollo Server + Express + PostgreSQL`);
+        logger.info('🚀 INITIALIZING GRAPHQL + EXPRESS APPLICATION...');
+        logger.info('===============================================');
+        logger.info(`🕒 Startup initiated at: ${new Date().toISOString()}`);
+        logger.info(`🎯 Target: Full-Stack GraphQL API Server`);
+        logger.info(`📦 Stack: Apollo Server + Express + PostgreSQL`);
 
         // TR: ApplicationBootstrap instance'ını al ve başlat
         // EN: Get ApplicationBootstrap instance and start
@@ -431,45 +432,44 @@ const initializeApp = async (): Promise<void> => {
         // TR: Başlatma süresini hesapla ve logla
         // EN: Calculate and log startup time
         const elapsedTime = Date.now() - startTime;
-        console.log(`⚡ Total startup time: ${elapsedTime}ms`);
+        logger.info(`⚡ Total startup time: ${elapsedTime}ms`);
 
         // TR: Process signal handler'ları setup et - GraphQL aware
         // EN: Setup process signal handlers - GraphQL aware
         process.on('SIGTERM', async () => {
-            console.log('\n📡 SIGTERM received - initiating GraphQL + Express shutdown...');
+            logger.info('\n📡 SIGTERM received - initiating GraphQL + Express shutdown...');
             await app.gracefulShutdown();
         });
 
         process.on('SIGINT', async () => {
-            console.log('\n📡 SIGINT received (Ctrl+C) - initiating GraphQL + Express shutdown...');
+            logger.info('\n📡 SIGINT received (Ctrl+C) - initiating GraphQL + Express shutdown...');
             await app.gracefulShutdown();
         });
 
         // TR: Unhandled promise rejection - GraphQL query errors vb.
         // EN: Unhandled promise rejection - GraphQL query errors etc.
         process.on('unhandledRejection', async (reason, promise) => {
-            console.error('❌ Unhandled Promise Rejection:', reason);
-            console.error('Promise that rejected:', promise);
-            console.log('🔄 Initiating emergency shutdown...');
+            logger.error('❌ Unhandled Promise Rejection:', { reason, promise });
+            logger.info('🔄 Initiating emergency shutdown...');
             await app.gracefulShutdown();
         });
 
         // TR: Uncaught exception - kritik hatalar
         // EN: Uncaught exception - critical errors
         process.on('uncaughtException', async (error) => {
-            console.error('❌ Uncaught Exception:', error);
-            console.log('🔄 Initiating emergency shutdown...');
+            logger.error('❌ Uncaught Exception:', { error });
+            logger.info('🔄 Initiating emergency shutdown...');
             await app.gracefulShutdown();
         });
 
-        console.log('\n🛡️ Signal handlers configured for GraphQL + Express stack');
-        console.log('🎯 Application ready to serve GraphQL and REST requests\n');
+        logger.info('\n🛡️ Signal handlers configured for GraphQL + Express stack');
+        logger.info('🎯 Application ready to serve GraphQL and REST requests\n');
 
     } catch (error) {
-        console.error('\n💥 CRITICAL ERROR - GraphQL + Express initialization failed:');
-        console.error('================================================================');
-        console.error(error);
-        console.error('\n💀 Application startup aborted');
+        logger.error('\n💥 CRITICAL ERROR - GraphQL + Express initialization failed:');
+        logger.error('================================================================');
+        logger.error('Application startup error:', { error });
+        logger.fatal('\n💀 Application startup aborted');
         process.exit(1);
     }
 };
