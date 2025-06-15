@@ -1,15 +1,14 @@
 // ================================
-// 🔔 NOTIFICATION MODEL - SYNCHRONIZED
+// 🔔 NOTIFICATION MODEL - COLUMN NAMES FIXED
 // ================================
 
 import {INotificationDocument} from "@app/interfaces/notification/notification.interface";
 import {DataTypes, Model, ModelDefined, Optional} from "sequelize";
 import logger from "@app/server/logger";
 import {sequelize} from "@app/server/database";
-import { UserModel } from ".";
 
 // ================================
-// 🔔 NOTIFICATION MODEL - SYNCHRONIZED
+// 🔔 NOTIFICATION MODEL - COLUMN MAPPING FIXED
 // ================================
 
 export const NotificationModelName = 'Notifications';
@@ -23,26 +22,31 @@ export const NotificationModelName = 'Notifications';
 type NotificationCreationAttributes = Optional<INotificationDocument, 'id' | 'createdAt'>;
 
 /**
- * Notification Model - Interface Synchronized
+ * Notification Model - Column Names Fixed for Sequelize
  *
- * TR: Interface ile sync edilmiş Notification modeli. Eğitmenin yapısını korur.
- * EN: Interface-synchronized Notification model. Preserves instructor's structure.
+ * TR: Sequelize underscored: true ile uyumlu column mapping'i
+ * EN: Column mapping compatible with Sequelize underscored: true
  */
 const NotificationModel: ModelDefined<INotificationDocument, NotificationCreationAttributes> = sequelize.define(
     NotificationModelName,
     {
         // ================================
-        // 🔗 FOREIGN KEY
+        // 🆔 PRIMARY KEY
+        // ================================
+        id: {
+            type: DataTypes.INTEGER,
+            primaryKey: true,
+            autoIncrement: true,
+            allowNull: false
+        },
+
+        // ================================
+        // 🔗 FOREIGN KEY - Column name explicitly mapped
         // ================================
         userId: {
             type: DataTypes.UUID,
             allowNull: false,
-            references: {
-                model: UserModel,
-                key: 'id',
-            },
-            onUpdate: 'CASCADE',
-            onDelete: 'CASCADE',
+            field: 'user_id', // TR: Database'de user_id olarak | EN: As user_id in database
             validate: {
                 notEmpty: {
                     msg: 'User ID cannot be empty'
@@ -51,11 +55,12 @@ const NotificationModel: ModelDefined<INotificationDocument, NotificationCreatio
         },
 
         // ================================
-        // 📝 NOTIFICATION FIELDS (Eğitmenin Orijinal Yapısı)
+        // 📝 NOTIFICATION FIELDS
         // ================================
         groupName: {
             type: DataTypes.STRING(50),
             allowNull: false,
+            field: 'group_name', // TR: Database'de group_name olarak | EN: As group_name in database
             validate: {
                 len: {
                     args: [1, 50],
@@ -68,11 +73,15 @@ const NotificationModel: ModelDefined<INotificationDocument, NotificationCreatio
         },
 
         emails: {
-            type: DataTypes.STRING, // Eğitmenin orijinal yaklaşımı - basit string
+            type: DataTypes.STRING(255), // Length limit eklendi
             allowNull: false,
             validate: {
                 notEmpty: {
                     msg: 'Emails cannot be empty'
+                },
+                len: {
+                    args: [1, 255],
+                    msg: 'Emails string too long'
                 }
             }
         },
@@ -80,82 +89,82 @@ const NotificationModel: ModelDefined<INotificationDocument, NotificationCreatio
         createdAt: {
             type: DataTypes.DATE,
             defaultValue: DataTypes.NOW,
-            allowNull: false
+            allowNull: false,
+            field: 'created_at' // TR: Database'de created_at olarak | EN: As created_at in database
+        },
+
+        updatedAt: {
+            type: DataTypes.DATE,
+            defaultValue: DataTypes.NOW,
+            allowNull: false,
+            field: 'updated_at' // TR: Database'de updated_at olarak | EN: As updated_at in database
         }
     },
     {
         // ================================
-        // 🔧 MODEL OPTIONS
+        // 🔧 MODEL OPTIONS - Fixed for underscored
         // ================================
+        tableName: 'Notifications', // Explicit table name
         timestamps: true,
-        updatedAt: 'updatedAt', // updatedAt field'ini aktif et
+        underscored: true, // TR: Snake case column names | EN: Snake case column names
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
 
         indexes: [
             {
-                fields: ['userId'],
+                fields: ['user_id'], // Snake case
                 name: 'notifications_user_id_index'
             },
             {
-                fields: ['groupName'],
+                fields: ['group_name'], // Snake case
                 name: 'notifications_group_name_index'
+            },
+            {
+                fields: ['created_at'], // Snake case
+                name: 'notifications_created_at_index'
             }
         ],
 
         // ================================
-        // 🔧 MODEL HOOKS - Enhanced with Logging
+        // 🔧 MODEL HOOKS - Simplified
         // ================================
         hooks: {
             /**
              * After Create Hook
-             *
-             * TR: Notification oluşturulduktan sonra başarılı log
-             * EN: Log successful notification creation
              */
             afterCreate: async (notification: Model) => {
-                logger.info('New notification created successfully', {
-                    notificationId: notification.dataValues.id,
-                    userId: notification.dataValues.userId,
-                    groupName: notification.dataValues.groupName,
-                    emails: notification.dataValues.emails
-                });
+                try {
+                    logger.info('New notification created successfully', {
+                        notificationId: notification.dataValues.id,
+                        userId: notification.dataValues.userId,
+                        groupName: notification.dataValues.groupName,
+                        emails: notification.dataValues.emails
+                    });
+                } catch (hookError) {
+                    logger.warn('Error in afterCreate hook:', { hookError });
+                }
             },
 
             /**
-             * After Update Hook
-             *
-             * TR: Notification güncellendikten sonra log
-             * EN: Log after notification update
-             */
-            afterUpdate: async (notification: Model) => {
-                logger.debug('Notification updated successfully', {
-                    notificationId: notification.dataValues.id,
-                    changedFields: Object.keys((notification as any).changed() || {})
-                });
-            },
-
-            /**
-             * Before Validate Hook
-             *
-             * TR: Validation'dan önce emails string'ini trim et
-             * EN: Trim emails string before validation
+             * Before Validate Hook - Simple trim only
              */
             beforeValidate: async (notification: Model) => {
-                if (notification.dataValues.emails) {
-                    // TR: Email string'ini sadece trim et, basit yaklaşım
-                    // EN: Just trim email string, simple approach
-                    notification.dataValues.emails = notification.dataValues.emails.trim();
-                    notification.set('emails', notification.dataValues.emails);
+                try {
+                    if (notification.dataValues.emails) {
+                        notification.dataValues.emails = notification.dataValues.emails.trim();
+                        notification.set('emails', notification.dataValues.emails);
+                    }
+
+                    if (notification.dataValues.groupName) {
+                        notification.dataValues.groupName = notification.dataValues.groupName.trim();
+                        notification.set('groupName', notification.dataValues.groupName);
+                    }
+                } catch (hookError) {
+                    logger.warn('Error in beforeValidate hook:', { hookError });
                 }
             }
         }
     }
 ) as ModelDefined<INotificationDocument, NotificationCreationAttributes>;
-
-NotificationModel.belongsTo(UserModel, {
-    foreignKey: 'userId',
-    as: 'user',
-    onDelete: 'CASCADE',
-    onUpdate: 'CASCADE'
-});
 
 export default NotificationModel;

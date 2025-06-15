@@ -16,6 +16,7 @@
     "@apollo/server": "^4.12.2",
     "@graphql-tools/merge": "^9.0.24",
     "@graphql-tools/schema": "^10.0.23",
+    "@types/uuid": "^10.0.0",
     "bcryptjs": "^3.0.2",
     "cookie-session": "^2.1.0",
     "cors": "^2.8.5",
@@ -32,6 +33,7 @@
     "sequelize": "^6.37.7",
     "typescript": "^5.8.3",
     "typescript-transform-paths": "^3.5.5",
+    "uuid": "^11.1.0",
     "zod": "^3.25.64"
   },
   "devDependencies": {

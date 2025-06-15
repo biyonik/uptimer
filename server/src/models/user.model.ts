@@ -6,7 +6,7 @@ import logger from "@app/server/logger";
 import {IAuthPayload, IUserDocument} from "@app/interfaces/user/user.interface";
 
 // ================================
-// 🔐 USER MODEL - SYNCHRONIZED
+// 🔐 USER MODEL - COLUMN NAMES FIXED
 // ================================
 
 const BCRYPT_SALT_ROUNDS = config.security.bcryptSaltRounds;
@@ -15,9 +15,6 @@ export const UserModelName = 'Users';
 
 /**
  * User Model Instance Methods Interface
- *
- * TR: User model instance metodları için interface
- * EN: Interface for User model instance methods
  */
 interface UserModelInstanceMethods extends Model {
     prototype: {
@@ -30,30 +27,35 @@ interface UserModelInstanceMethods extends Model {
 
 /**
  * User Creation Attributes
- *
- * TR: User oluşturma için gerekli attribute'lar (id ve timestamps optional)
- * EN: Required attributes for user creation (id and timestamps optional)
  */
 type UserCreationAttributes = Optional<IUserDocument, 'id' | 'createdAt'>;
 
 /**
- * User Model - Interface Synchronized
+ * User Model - Column Names Fixed for Sequelize underscored
  *
- * TR: Interface ile sync edilmiş User modeli. Eğitmenin field'larını korur,
- *     sadece validation, logging ve method'ları iyileştirir.
- *
- * EN: Interface-synchronized User model. Preserves instructor's fields,
- *     only improves validation, logging and methods.
+ * TR: Sequelize underscored: true ile uyumlu column mapping'i
+ * EN: Column mapping compatible with Sequelize underscored: true
  */
 const UserModel: ModelDefined<IUserDocument, UserCreationAttributes> & UserModelInstanceMethods = sequelize.define(
     UserModelName,
     {
         // ================================
-        // 🆔 CORE FIELDS (Eğitmenin Orijinal Yapısı)
+        // 🆔 PRIMARY KEY - UUID
+        // ================================
+        id: {
+            type: DataTypes.UUID,
+            primaryKey: true,
+            defaultValue: DataTypes.UUIDV4,
+            allowNull: false
+        },
+
+        // ================================
+        // 🆔 CORE FIELDS - Explicit column mapping
         // ================================
         username: {
             type: DataTypes.STRING(50),
             allowNull: false,
+            unique: true,
             validate: {
                 len: {
                     args: [3, 50],
@@ -71,6 +73,7 @@ const UserModel: ModelDefined<IUserDocument, UserCreationAttributes> & UserModel
         email: {
             type: DataTypes.STRING(100),
             allowNull: false,
+            unique: true,
             validate: {
                 isEmail: {
                     msg: 'Please provide a valid email address'
@@ -88,11 +91,18 @@ const UserModel: ModelDefined<IUserDocument, UserCreationAttributes> & UserModel
         password: {
             type: DataTypes.STRING(255),
             allowNull: true, // Social login için null olabilir
+            validate: {
+                len: {
+                    args: [0, 255],
+                    msg: 'Password is too long'
+                }
+            }
         },
 
         googleId: {
             type: DataTypes.STRING(100),
             allowNull: true,
+            field: 'google_id', // TR: Database'de google_id olarak | EN: As google_id in database
             validate: {
                 len: {
                     args: [0, 100],
@@ -104,6 +114,7 @@ const UserModel: ModelDefined<IUserDocument, UserCreationAttributes> & UserModel
         facebookId: {
             type: DataTypes.STRING(100),
             allowNull: true,
+            field: 'facebook_id', // TR: Database'de facebook_id olarak | EN: As facebook_id in database
             validate: {
                 len: {
                     args: [0, 100],
@@ -115,15 +126,26 @@ const UserModel: ModelDefined<IUserDocument, UserCreationAttributes> & UserModel
         createdAt: {
             type: DataTypes.DATE,
             defaultValue: DataTypes.NOW,
-            allowNull: false
+            allowNull: false,
+            field: 'created_at' // TR: Database'de created_at olarak | EN: As created_at in database
+        },
+
+        updatedAt: {
+            type: DataTypes.DATE,
+            defaultValue: DataTypes.NOW,
+            allowNull: false,
+            field: 'updated_at' // TR: Database'de updated_at olarak | EN: As updated_at in database
         }
     },
     {
         // ================================
-        // 🔧 MODEL OPTIONS
+        // 🔧 MODEL OPTIONS - Fixed for underscored
         // ================================
-        timestamps: true, // createdAt, updatedAt otomatik
-        updatedAt: 'updatedAt', // updatedAt field'ini aktif et
+        tableName: 'Users', // Explicit table name
+        timestamps: true,
+        underscored: true, // TR: Snake case column names | EN: Snake case column names
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
 
         indexes: [
             {
@@ -135,106 +157,92 @@ const UserModel: ModelDefined<IUserDocument, UserCreationAttributes> & UserModel
                 unique: true,
                 fields: ['email'],
                 name: 'users_email_unique'
+            },
+            {
+                fields: ['google_id'], // Snake case
+                name: 'users_google_id_index'
+            },
+            {
+                fields: ['facebook_id'], // Snake case
+                name: 'users_facebook_id_index'
             }
         ],
 
         // ================================
-        // 🔧 MODEL HOOKS - Enhanced with Logging
+        // 🔧 MODEL HOOKS - Simplified
         // ================================
         hooks: {
             /**
              * Before Create Hook
-             *
-             * TR: User oluşturulmadan önce password hash'le ve logla
-             * EN: Hash password and log before user creation
              */
             beforeCreate: async (user: Model) => {
                 try {
-                    if (user.dataValues.password !== undefined && user.dataValues.password !== null) {
+                    // TR: UUID generate et (eğer yoksa)
+                    // EN: Generate UUID (if not exists)
+                    if (!user.dataValues.id) {
+                        const { v4: uuidv4 } = await import('uuid');
+                        user.dataValues.id = uuidv4();
+                        user.set('id', user.dataValues.id);
+                    }
+
+                    // TR: Password hash'le (eğer varsa)
+                    // EN: Hash password (if exists)
+                    if (user.dataValues.password !== undefined && user.dataValues.password !== null && user.dataValues.password.length > 0) {
                         const hashedPassword = await hash(user.dataValues.password, BCRYPT_SALT_ROUNDS);
-                        user.dataValues = {
-                            ...user.dataValues,
-                            password: hashedPassword
-                        };
-                        user.set(user.dataValues);
+                        user.dataValues.password = hashedPassword;
+                        user.set('password', hashedPassword);
 
                         logger.debug('Password hashed for new user', {
-                            username: user.dataValues.username
-                        });
-                    }
-                } catch (error) {
-                    logger.error('Error hashing password in beforeCreate hook:', { error });
-                    throw new Error('Failed to hash password during user creation');
-                }
-            },
-
-            /**
-             * Before Update Hook
-             *
-             * TR: User güncellenmeden önce password hash'le (eğer değişmişse)
-             * EN: Hash password before user update (if changed)
-             */
-            beforeUpdate: async (user: Model) => {
-                try {
-                    if ((user as any).changed('password') && user.dataValues.password) {
-                        const hashedPassword = await hash(user.dataValues.password, BCRYPT_SALT_ROUNDS);
-                        user.dataValues = {
-                            ...user.dataValues,
-                            password: hashedPassword
-                        };
-                        user.set(user.dataValues);
-
-                        logger.debug('Password hashed for user update', {
+                            username: user.dataValues.username,
                             userId: user.dataValues.id
                         });
                     }
+
+                    // TR: String field'leri trim et
+                    // EN: Trim string fields
+                    if (user.dataValues.username) {
+                        user.dataValues.username = user.dataValues.username.trim();
+                        user.set('username', user.dataValues.username);
+                    }
+
+                    if (user.dataValues.email) {
+                        user.dataValues.email = user.dataValues.email.trim().toLowerCase();
+                        user.set('email', user.dataValues.email);
+                    }
+
                 } catch (error) {
-                    logger.error('Error hashing password in beforeUpdate hook:', { error });
-                    throw new Error('Failed to hash password during user update');
+                    logger.error('Error in beforeCreate hook:', { error });
+                    throw new Error('Failed to prepare user for creation');
                 }
             },
 
             /**
              * After Create Hook
-             *
-             * TR: User oluşturulduktan sonra başarılı log
-             * EN: Log successful user creation
              */
             afterCreate: async (user: Model) => {
-                logger.info('New user created successfully', {
-                    userId: user.dataValues.id,
-                    username: user.dataValues.username,
-                    email: user.dataValues.email,
-                    hasGoogleId: !!user.dataValues.googleId,
-                    hasFacebookId: !!user.dataValues.facebookId
-                });
-            },
-
-            /**
-             * After Update Hook
-             *
-             * TR: User güncellendikten sonra log
-             * EN: Log after user update
-             */
-            afterUpdate: async (user: Model) => {
-                logger.debug('User updated successfully', {
-                    userId: user.dataValues.id,
-                    changedFields: Object.keys((user as any).changed() || {})
-                });
+                try {
+                    logger.info('New user created successfully', {
+                        userId: user.dataValues.id,
+                        username: user.dataValues.username,
+                        email: user.dataValues.email,
+                        hasGoogleId: !!user.dataValues.googleId,
+                        hasFacebookId: !!user.dataValues.facebookId,
+                        hasPassword: !!user.dataValues.password
+                    });
+                } catch (hookError) {
+                    logger.warn('Error in afterCreate hook:', { hookError });
+                }
             }
         }
     }
 ) as ModelDefined<IUserDocument, UserCreationAttributes> & UserModelInstanceMethods;
 
 // ================================
-// 🔧 USER MODEL INSTANCE METHODS - Interface Compatible
+// 🔧 USER MODEL INSTANCE METHODS
 // ================================
 
 /**
  * Compare password with hashed password
- *
- * TR: Şifreyi hash'lenmiş şifre ile karşılaştır
- * EN: Compare password with hashed password
  */
 UserModel.prototype.comparePassword = async function (password: string, hashedPassword: string): Promise<boolean> {
     try {
@@ -255,9 +263,6 @@ UserModel.prototype.comparePassword = async function (password: string, hashedPa
 
 /**
  * Hash password
- *
- * TR: Şifreyi hash'le
- * EN: Hash password
  */
 UserModel.prototype.hashPassword = async function (password: string): Promise<string> {
     try {
@@ -276,10 +281,7 @@ UserModel.prototype.hashPassword = async function (password: string): Promise<st
 };
 
 /**
- * Generate authentication JSON for JWT - Interface Compatible
- *
- * TR: JWT için authentication JSON oluştur (interface'e uygun)
- * EN: Generate authentication JSON for JWT (interface compatible)
+ * Generate authentication JSON for JWT
  */
 UserModel.prototype.toAuthJSON = function (): IAuthPayload {
     return {
@@ -290,15 +292,11 @@ UserModel.prototype.toAuthJSON = function (): IAuthPayload {
 };
 
 /**
- * Generate public JSON - Interface Compatible
- *
- * TR: Public JSON oluştur (interface'e uygun, şifre olmadan)
- * EN: Generate public JSON (interface compatible, without password)
+ * Generate public JSON
  */
 UserModel.prototype.toJSON = function (): IUserDocument {
     const { password, ...userWithoutPassword } = this.dataValues;
     return userWithoutPassword;
 };
-
 
 export default UserModel;
