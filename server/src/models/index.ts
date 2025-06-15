@@ -1,4 +1,3 @@
-export { UserModel } from './user.model';
-export { NotificationModel } from './notification.model';
+export {default as UserModel} from './user.model';
+export {default as NotificationModel} from './notification.model';
 
-import './associations';

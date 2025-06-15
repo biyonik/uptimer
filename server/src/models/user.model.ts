@@ -1,4 +1,4 @@
-import { DataTypes, Model, ModelDefined, Optional, Op } from "sequelize";
+import { DataTypes, Model, ModelDefined, Optional } from "sequelize";
 import { hash, compare } from "bcryptjs";
 import { config } from "@app/server/config";
 import { sequelize } from "@app/server/database";
@@ -39,17 +39,17 @@ type UserCreationAttributes = Optional<IUserDocument, 'id' | 'createdAt'>;
 /**
  * User Model - Interface Synchronized
  *
- * TR: Interface ile sync edilmiş User modeli.
+ * TR: Interface ile sync edilmiş User modeli. Eğitmenin field'larını korur,
  *     sadece validation, logging ve method'ları iyileştirir.
  *
- * EN: Interface-synchronized User model.
+ * EN: Interface-synchronized User model. Preserves instructor's fields,
  *     only improves validation, logging and methods.
  */
-export const UserModel: ModelDefined<IUserDocument, UserCreationAttributes> & UserModelInstanceMethods = sequelize.define(
+const UserModel: ModelDefined<IUserDocument, UserCreationAttributes> & UserModelInstanceMethods = sequelize.define(
     UserModelName,
     {
         // ================================
-        // 🆔 CORE FIELDS
+        // 🆔 CORE FIELDS (Eğitmenin Orijinal Yapısı)
         // ================================
         username: {
             type: DataTypes.STRING(50),
@@ -135,28 +135,6 @@ export const UserModel: ModelDefined<IUserDocument, UserCreationAttributes> & Us
                 unique: true,
                 fields: ['email'],
                 name: 'users_email_unique'
-            },
-            {
-                fields: ['googleId'],
-                name: 'users_google_id_index',
-                where: {
-                    googleId: {
-                        [Op.ne]: null
-                    }
-                }
-            },
-            {
-                fields: ['facebookId'],
-                name: 'users_facebook_id_index',
-                where: {
-                    facebookId: {
-                        [Op.ne]: null
-                    }
-                }
-            },
-            {
-                fields: ['createdAt'],
-                name: 'users_created_at_index'
             }
         ],
 
@@ -241,7 +219,7 @@ export const UserModel: ModelDefined<IUserDocument, UserCreationAttributes> & Us
             afterUpdate: async (user: Model) => {
                 logger.debug('User updated successfully', {
                     userId: user.dataValues.id,
-                    changedFields: Object.keys(user.changed() || {})
+                    changedFields: Object.keys((user as any).changed() || {})
                 });
             }
         }
@@ -321,3 +299,6 @@ UserModel.prototype.toJSON = function (): IUserDocument {
     const { password, ...userWithoutPassword } = this.dataValues;
     return userWithoutPassword;
 };
+
+
+export default UserModel;

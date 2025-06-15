@@ -8,6 +8,10 @@ import logger from "@app/server/logger";
 import {sequelize} from "@app/server/database";
 import { UserModel } from ".";
 
+// ================================
+// 🔔 NOTIFICATION MODEL - SYNCHRONIZED
+// ================================
+
 export const NotificationModelName = 'Notifications';
 
 /**
@@ -21,10 +25,10 @@ type NotificationCreationAttributes = Optional<INotificationDocument, 'id' | 'cr
 /**
  * Notification Model - Interface Synchronized
  *
- * TR: Interface ile sync edilmiş Notification modeli.
- * EN: Interface-synchronized Notification model.
+ * TR: Interface ile sync edilmiş Notification modeli. Eğitmenin yapısını korur.
+ * EN: Interface-synchronized Notification model. Preserves instructor's structure.
  */
-export const NotificationModel: ModelDefined<INotificationDocument, NotificationCreationAttributes> = sequelize.define(
+const NotificationModel: ModelDefined<INotificationDocument, NotificationCreationAttributes> = sequelize.define(
     NotificationModelName,
     {
         // ================================
@@ -47,7 +51,7 @@ export const NotificationModel: ModelDefined<INotificationDocument, Notification
         },
 
         // ================================
-        // 📝 NOTIFICATION FIELDS
+        // 📝 NOTIFICATION FIELDS (Eğitmenin Orijinal Yapısı)
         // ================================
         groupName: {
             type: DataTypes.STRING(50),
@@ -64,7 +68,7 @@ export const NotificationModel: ModelDefined<INotificationDocument, Notification
         },
 
         emails: {
-            type: DataTypes.STRING,
+            type: DataTypes.STRING, // Eğitmenin orijinal yaklaşımı - basit string
             allowNull: false,
             validate: {
                 notEmpty: {
@@ -84,7 +88,7 @@ export const NotificationModel: ModelDefined<INotificationDocument, Notification
         // 🔧 MODEL OPTIONS
         // ================================
         timestamps: true,
-        updatedAt: 'updatedAt',
+        updatedAt: 'updatedAt', // updatedAt field'ini aktif et
 
         indexes: [
             {
@@ -94,14 +98,6 @@ export const NotificationModel: ModelDefined<INotificationDocument, Notification
             {
                 fields: ['groupName'],
                 name: 'notifications_group_name_index'
-            },
-            {
-                fields: ['createdAt'],
-                name: 'notifications_created_at_index'
-            },
-            {
-                fields: ['userId', 'groupName'],
-                name: 'notifications_user_group_composite_index'
             }
         ],
 
@@ -133,7 +129,7 @@ export const NotificationModel: ModelDefined<INotificationDocument, Notification
             afterUpdate: async (notification: Model) => {
                 logger.debug('Notification updated successfully', {
                     notificationId: notification.dataValues.id,
-                    changedFields: Object.keys(notification.changed() || {})
+                    changedFields: Object.keys((notification as any).changed() || {})
                 });
             },
 
@@ -154,3 +150,12 @@ export const NotificationModel: ModelDefined<INotificationDocument, Notification
         }
     }
 ) as ModelDefined<INotificationDocument, NotificationCreationAttributes>;
+
+NotificationModel.belongsTo(UserModel, {
+    foreignKey: 'userId',
+    as: 'user',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
+});
+
+export default NotificationModel;
