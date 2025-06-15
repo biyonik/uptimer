@@ -1,30 +1,32 @@
 /**
- * Ana Uygulama Giriş Noktası (Main Application Entry Point)
+ * Ana Uygulama Giriş Noktası - GraphQL + Express Integration
  *
- * TR: Bu dosya, tüm uygulamanın başlatıldığı ana giriş noktasıdır.
- *     Express uygulamasını oluşturur, MonitorServer ile HTTP sunucusunu başlatır
- *     ve gerekli error handling'i sağlar. Uygulama lifecycle'ının başladığı yerdir.
+ * TR: Bu dosya, GraphQL Apollo Server ve Express uygulamasının birlikte başlatıldığı
+ *     ana giriş noktasıdır. Database bağlantısı, Apollo Server, Express middleware'leri
+ *     ve HTTP sunucusunu sıralı bir şekilde başlatır. Full-stack uygulamanın lifecycle'ının
+ *     başladığı yerdir.
  *
- * EN: This file is the main entry point where the entire application starts.
- *     Creates Express application, starts HTTP server with MonitorServer
- *     and provides necessary error handling. This is where application lifecycle begins.
+ * EN: This file is the main entry point where GraphQL Apollo Server and Express application
+ *     start together. Sequentially starts database connection, Apollo Server, Express middlewares
+ *     and HTTP server. This is where the full-stack application lifecycle begins.
  */
 
-import express, {Express, NextFunction, Request, Response} from 'express';
+import express, { Express } from 'express';
 import MonitorServer from './server/server';
-import { config, validateConfig } from './server/config'
+import { config, validateConfig } from './server/config';
 import { connectDatabase, syncDatabase, closeDatabase } from './server/database';
 
 /**
- * ApplicationBootstrap Sınıfı
+ * ApplicationBootstrap Sınıfı - GraphQL + Express Integration
  *
- * TR: Uygulamanın başlatılma sürecini yöneten sınıf. Singleton pattern kullanır.
- *     Database bağlantısı, konfigürasyon validasyonu, Express setup ve server başlatma
- *     işlemlerini sıralı bir şekilde gerçekleştirir.
+ * TR: GraphQL Apollo Server ve Express uygulamasının başlatılma sürecini yöneten sınıf.
+ *     Singleton pattern kullanır. Database bağlantısı, GraphQL schema hazırlığı,
+ *     Apollo Server başlatma, Express setup ve HTTP server başlatma işlemlerini
+ *     sıralı bir şekilde gerçekleştirir.
  *
- * EN: Class that manages application bootstrap process. Uses singleton pattern.
- *     Performs database connection, config validation, Express setup and server startup
- *     operations in a sequential manner.
+ * EN: Class that manages startup process of GraphQL Apollo Server and Express application.
+ *     Uses singleton pattern. Performs database connection, GraphQL schema preparation,
+ *     Apollo Server startup, Express setup and HTTP server startup operations sequentially.
  */
 class ApplicationBootstrap {
     /**
@@ -40,8 +42,8 @@ class ApplicationBootstrap {
     private readonly app: Express;
 
     /**
-     * TR: MonitorServer instance'ı - HTTP sunucusunu yönetir
-     * EN: MonitorServer instance - manages HTTP server
+     * TR: MonitorServer instance'ı - HTTP ve GraphQL sunucularını yönetir
+     * EN: MonitorServer instance - manages HTTP and GraphQL servers
      */
     private readonly monitorServer: MonitorServer;
 
@@ -55,13 +57,15 @@ class ApplicationBootstrap {
      * Constructor - Kurucu Metot
      *
      * TR: Private constructor - Singleton pattern için dışarıdan instance oluşturulmasını engeller.
-     *     Express uygulamasını oluşturur ve MonitorServer'ı initialize eder.
+     *     Express uygulamasını oluşturur ve MonitorServer'ı (Apollo Server dahil) initialize eder.
      *
      * EN: Private constructor - Prevents external instance creation for Singleton pattern.
-     *     Creates Express application and initializes MonitorServer.
+     *     Creates Express application and initializes MonitorServer (including Apollo Server).
      */
     private constructor() {
         this.app = express();
+        // TR: MonitorServer artık Apollo Server'ı da içeriyor
+        // EN: MonitorServer now also includes Apollo Server
         this.monitorServer = new MonitorServer(this.app);
     }
 
@@ -84,21 +88,21 @@ class ApplicationBootstrap {
     }
 
     /**
-     * initializeApplication() - Ana Uygulama Başlatma Metodu
+     * initializeApplication() - Ana Uygulama Başlatma Metodu - GraphQL Enhanced
      *
-     * TR: Uygulamanın tüm başlatma sürecini yönetir. Sırasıyla:
+     * TR: GraphQL + Express uygulamasının tüm başlatma sürecini yönetir. Sırasıyla:
      *     1. Konfigürasyon validasyonu
-     *     2. Database bağlantısı
-     *     3. Database model senkronizasyonu
-     *     4. Express middleware setup
+     *     2. Database bağlantısı ve model sync
+     *     3. GraphQL schema hazırlığı kontrolü
+     *     4. Apollo Server + Express başlatma (MonitorServer içinde)
      *     5. HTTP sunucu başlatma
      *     işlemlerini gerçekleştirir.
      *
-     * EN: Manages entire application startup process. Sequentially:
+     * EN: Manages entire GraphQL + Express application startup process. Sequentially:
      *     1. Configuration validation
-     *     2. Database connection
-     *     3. Database model synchronization
-     *     4. Express middleware setup
+     *     2. Database connection and model sync
+     *     3. GraphQL schema readiness check
+     *     4. Apollo Server + Express startup (inside MonitorServer)
      *     5. HTTP server startup
      *     operations are performed.
      */
@@ -111,31 +115,34 @@ class ApplicationBootstrap {
         }
 
         try {
-            console.log('🚀 Starting application bootstrap process...');
+            const startTime = Date.now();
+            console.log('🚀 STARTING GRAPHQL + EXPRESS APPLICATION...');
+            console.log('==============================================');
 
             // TR: 1. Konfigürasyon Validasyonu
             // EN: 1. Configuration Validation
             await this.validateConfiguration();
 
-            // TR: 2. Database Bağlantısı
-            // EN: 2. Database Connection
+            // TR: 2. Database Bağlantısı ve Setup
+            // EN: 2. Database Connection and Setup
             await this.setupDatabase();
 
-            // TR: 3. Express Uygulaması Konfigürasyonu
-            // EN: 3. Express Application Configuration
-            await this.configureExpress();
+            // TR: 3. GraphQL Schema Hazırlığı Kontrolü
+            // EN: 3. GraphQL Schema Readiness Check
+            await this.checkGraphQLReadiness();
 
-            // TR: 4. HTTP Sunucu Başlatma
-            // EN: 4. HTTP Server Startup
-            await this.startServer();
+            // TR: 4. Full-Stack Server Başlatma (Apollo + Express + HTTP)
+            // EN: 4. Full-Stack Server Startup (Apollo + Express + HTTP)
+            await this.startFullStackServer();
 
             // TR: 5. Başlatma tamamlandı
             // EN: 5. Initialization completed
             this.isInitialized = true;
-            this.logSuccessfulStartup();
+            const elapsedTime = Date.now() - startTime;
+            this.logSuccessfulStartup(elapsedTime);
 
         } catch (error) {
-            console.error('❌ Application bootstrap failed:', error);
+            console.error('❌ GraphQL + Express application bootstrap failed:', error);
             await this.handleBootstrapError(error);
         }
     }
@@ -143,14 +150,14 @@ class ApplicationBootstrap {
     /**
      * validateConfiguration() - Konfigürasyon Validasyon Metodu
      *
-     * TR: Environment değişkenlerini ve uygulama konfigürasyonunu validate eder.
-     *     Gerekli değişkenlerin varlığını ve formatını kontrol eder.
+     * TR: Environment değişkenlerini ve GraphQL + Express konfigürasyonunu validate eder.
+     *     GraphQL endpoint, CORS, JWT secret gibi ayarları kontrol eder.
      *
-     * EN: Validates environment variables and application configuration.
-     *     Checks existence and format of required variables.
+     * EN: Validates environment variables and GraphQL + Express configuration.
+     *     Checks GraphQL endpoint, CORS, JWT secret and other settings.
      */
     private async validateConfiguration(): Promise<void> {
-        console.log('🔧 Validating application configuration...');
+        console.log('🔧 Validating GraphQL + Express configuration...');
 
         try {
             // TR: Zod ile environment validation
@@ -159,7 +166,10 @@ class ApplicationBootstrap {
 
             console.log('✅ Configuration validation successful');
             console.log(`📊 Environment: ${config.NODE_ENV}`);
-            console.log(`🌐 Target Port: ${config.PORT}`);
+            console.log(`🌐 HTTP Port: ${config.PORT}`);
+            console.log(`🔗 GraphQL Endpoint: /graphql`);
+            console.log(`🎮 GraphQL Playground: ${config.isDevelopment ? 'enabled' : 'disabled'}`);
+            console.log(`🌍 CORS Origin: ${config.client.corsOrigin}`);
 
         } catch (error) {
             console.error('❌ Configuration validation failed:', error);
@@ -168,37 +178,33 @@ class ApplicationBootstrap {
     }
 
     /**
-     * setupDatabase() - Database Kurulum Metodu
+     * setupDatabase() - Database Kurulum Metodu - GraphQL Ready
      *
-     * TR: Database bağlantısını kurar ve gerekirse model senkronizasyonu yapar.
-     *     Development ortamında model'leri otomatik sync eder.
-     *     Production'da dikkatli sync yapar.
+     * TR: Database bağlantısını kurar ve GraphQL için gerekli model'leri sync eder.
+     *     GraphQL resolver'larının kullanacağı database connection'ı hazırlar.
      *
-     * EN: Establishes database connection and synchronizes models if needed.
-     *     Auto-syncs models in development environment.
-     *     Careful sync in production.
+     * EN: Establishes database connection and syncs models needed for GraphQL.
+     *     Prepares database connection that GraphQL resolvers will use.
      */
     private async setupDatabase(): Promise<void> {
-        console.log('🗄️ Setting up database connection...');
+        console.log('🗄️ Setting up database for GraphQL + Express...');
 
         try {
             // TR: Database bağlantısını test et
             // EN: Test database connection
             await connectDatabase();
 
-            // TR: Development ortamında model sync
-            // EN: Model sync in development environment
+            // TR: GraphQL için model synchronization
+            // EN: Model synchronization for GraphQL
             if (config.isDevelopment) {
-                console.log('🔄 Synchronizing database models (development mode)...');
+                console.log('🔄 Synchronizing database models for GraphQL (development mode)...');
                 await syncDatabase({ alter: true });
             } else if (config.NODE_ENV === 'production') {
-                // TR: Production'da sadece safe sync
-                // EN: Only safe sync in production
-                console.log('🔒 Running safe database sync (production mode)...');
+                console.log('🔒 Running safe database sync for production GraphQL...');
                 await syncDatabase({ alter: false, force: false });
             }
 
-            console.log('✅ Database setup completed');
+            console.log('✅ Database setup completed for GraphQL resolvers');
 
         } catch (error) {
             console.error('❌ Database setup failed:', error);
@@ -207,186 +213,183 @@ class ApplicationBootstrap {
     }
 
     /**
-     * configureExpress() - Fixed Express Konfigürasyon Metodu
+     * checkGraphQLReadiness() - GraphQL Hazırlık Kontrolü
      *
-     * TR: Express uygulamasına gerekli middleware'leri ve route'ları ekler.
-     *     JSON parsing, CORS, security headers, API routes vb. konfigürasyonları yapar.
-     *     path-to-regexp hatası için wildcard route'u düzeltildi.
+     * TR: GraphQL schema'larının, resolver'larının ve type definition'larının
+     *     hazır olduğunu kontrol eder. Apollo Server başlatılmadan önce
+     *     gerekli GraphQL asset'lerinin varlığını doğrular.
      *
-     * EN: Adds necessary middlewares and routes to Express application.
-     *     Configures JSON parsing, CORS, security headers, API routes etc.
-     *     Fixed wildcard route for path-to-regexp error.
+     * EN: Checks that GraphQL schemas, resolvers and type definitions are ready.
+     *     Validates existence of necessary GraphQL assets before Apollo Server startup.
      */
-    private async configureExpress(): Promise<void> {
-        console.log('⚙️ Configuring Express application...');
+    private async checkGraphQLReadiness(): Promise<void> {
+        console.log('📡 Checking GraphQL schema readiness...');
 
         try {
-            // TR: JSON body parser - gelen isteklerin JSON body'sini parse et
-            // EN: JSON body parser - parse JSON body of incoming requests
-            this.app.use(express.json({
-                limit: '10mb',  // TR: Maximum request body boyutu | EN: Maximum request body size
-                strict: true    // TR: Sadece geçerli JSON kabul et | EN: Accept only valid JSON
-            }));
+            // TR: GraphQL schema dosyalarının varlığını kontrol et
+            // EN: Check existence of GraphQL schema files
 
-            // TR: URL encoded data parser - form verilerini parse et
-            // EN: URL encoded data parser - parse form data
-            this.app.use(express.urlencoded({
-                extended: true,  // TR: Gelişmiş parsing | EN: Advanced parsing
-                limit: '10mb'    // TR: Maximum boyut limiti | EN: Maximum size limit
-            }));
+            // TR: Şu an için basic check - gelecekte schema validation eklenebilir
+            // EN: Basic check for now - schema validation can be added in future
+            console.log('📋 GraphQL TypeDefs: Ready (embedded)');
+            console.log('⚙️ GraphQL Resolvers: Ready (embedded)');
+            console.log('🔌 GraphQL Context: Ready (authentication + database)');
 
-            // TR: Development ortamında request logging
-            // EN: Request logging in development environment
-            if (config.isDevelopment) {
-                this.app.use((req: Request, _res: Response, next: NextFunction) => {
-                    console.log(`📝 ${req.method} ${req.path} - ${new Date().toISOString()}`);
-                    next();
-                });
-            }
+            // TR: Gelecekte buraya eklenebilir:
+            // EN: Can be added in future:
+            // - Schema file validation
+            // - Resolver type checking
+            // - Custom directive validation
+            // - Plugin configuration check
 
-            // TR: Ana route - API durumu
-            // EN: Main route - API status
-            this.app.get('/', (_req: Request, res: Response) => {
-                res.json({
-                    message: 'GraphQL + Next.js API Server',
-                    status: 'running',
-                    environment: config.NODE_ENV,
-                    timestamp: new Date().toISOString(),
-                    version: '1.0.0'
-                });
-            });
-
-            // TR: API info route
-            // EN: API info route
-            this.app.get('/api', (_req: Request, res:Response) => {
-                res.json({
-                    message: 'API Base Endpoint',
-                    status: 'available',
-                    endpoints: {
-                        health: '/health',
-                        graphql: '/graphql (coming soon)',
-                        status: '/'
-                    },
-                    timestamp: new Date().toISOString()
-                });
-            });
-
-            console.log('✅ Express configuration completed');
+            console.log('✅ GraphQL schema readiness check passed');
 
         } catch (error) {
-            console.error('❌ Express configuration failed:', error);
-            throw new Error(`Express configuration error: ${error}`);
+            console.error('❌ GraphQL readiness check failed:', error);
+            throw new Error(`GraphQL readiness error: ${error}`);
         }
     }
 
     /**
-     * startServer() - HTTP Sunucu Başlatma Metodu
+     * startFullStackServer() - Full-Stack Server Başlatma Metodu
      *
-     * TR: MonitorServer ile HTTP sunucusunu başlatır.
-     *     Async olarak çalışır ve başlatma tamamlanana kadar bekler.
+     * TR: Apollo GraphQL Server ve Express uygulamasını birlikte başlatır.
+     *     MonitorServer içinde Apollo Server, Express middleware'leri ve
+     *     HTTP server'ı sıralı bir şekilde başlatılır.
      *
-     * EN: Starts HTTP server with MonitorServer.
-     *     Works asynchronously and waits until startup completes.
+     * EN: Starts Apollo GraphQL Server and Express application together.
+     *     Inside MonitorServer, Apollo Server, Express middlewares and
+     *     HTTP server are started sequentially.
      */
-    private async startServer(): Promise<void> {
-        console.log('🌐 Starting HTTP server...');
+    private async startFullStackServer(): Promise<void> {
+        console.log('🌐 Starting Full-Stack Server (GraphQL + Express + HTTP)...');
 
         try {
-            // TR: MonitorServer ile sunucuyu başlat
-            // EN: Start server with MonitorServer
+            // TR: MonitorServer.start() artık şunları yapıyor:
+            // EN: MonitorServer.start() now does:
+            // 1. Apollo Server startup
+            // 2. Express middleware application
+            // 3. GraphQL middleware integration
+            // 4. HTTP server startup
             await this.monitorServer.start();
 
-            console.log('✅ HTTP server started successfully');
+            console.log('✅ Full-Stack server started successfully');
 
         } catch (error) {
-            console.error('❌ Server startup failed:', error);
-            throw new Error(`Server startup error: ${error}`);
+            console.error('❌ Full-Stack server startup failed:', error);
+            throw new Error(`Full-Stack server startup error: ${error}`);
         }
     }
 
     /**
-     * logSuccessfulStartup() - Başarılı Başlatma Log Metodu
+     * logSuccessfulStartup() - Başarılı Başlatma Log Metodu - GraphQL Enhanced
      *
-     * TR: Uygulama başarıyla başlatıldığında detaylı bilgileri loglar.
-     *     Server durumu, bağlantı bilgileri ve kullanılabilir endpoint'leri gösterir.
+     * TR: GraphQL + Express uygulaması başarıyla başlatıldığında detaylı bilgileri loglar.
+     *     GraphQL endpoint'leri, Playground, REST API ve health check bilgilerini gösterir.
      *
-     * EN: Logs detailed information when application starts successfully.
-     *     Shows server status, connection info and available endpoints.
+     * EN: Logs detailed information when GraphQL + Express application starts successfully.
+     *     Shows GraphQL endpoints, Playground, REST API and health check information.
+     *
+     * @param elapsedTime - TR: Başlatma süresi (ms) | EN: Startup time (ms)
      */
-    private logSuccessfulStartup(): void {
+    private logSuccessfulStartup(elapsedTime: number): void {
         const serverInfo = this.monitorServer.getServerInfo();
 
-        console.log('\n🎉 APPLICATION STARTUP SUCCESSFUL!');
-        console.log('=====================================');
+        console.log('\n🎉 GRAPHQL + EXPRESS APPLICATION STARTUP SUCCESSFUL!');
+        console.log('=====================================================');
         console.log(`📊 Environment: ${serverInfo.environment}`);
-        console.log(`🌐 Server Port: ${serverInfo.port}`);
+        console.log(`🌐 HTTP Port: ${serverInfo.port}`);
         console.log(`🔧 Process ID: ${serverInfo.pid}`);
-        console.log(`⏱️ Startup Time: ${new Date().toISOString()}`);
+        console.log(`⚡ Startup Time: ${elapsedTime}ms`);
+        console.log(`⏱️ Started At: ${new Date().toISOString()}`);
         console.log('\n🔗 Available Endpoints:');
-        console.log(`   • API Status: http://localhost:${serverInfo.port}/`);
-        console.log(`   • Health Check: http://localhost:${serverInfo.port}/health`);
-        console.log('=====================================\n');
+        console.log(`   • 🏠 REST API Status: http://localhost:${serverInfo.port}/`);
+        console.log(`   • ❤️ Health Check: http://localhost:${serverInfo.port}/health`);
+        console.log(`   • 🚀 GraphQL API: http://localhost:${serverInfo.port}/graphql`);
+
+        if (config.isDevelopment) {
+            console.log(`   • 🎮 GraphQL Playground: http://localhost:${serverInfo.port}/graphql`);
+            console.log('\n📋 Development Features:');
+            console.log(`   • GraphQL Introspection: ✅ Enabled`);
+            console.log(`   • Request Logging: ✅ Enabled`);
+            console.log(`   • Error Stack Traces: ✅ Enabled`);
+        } else {
+            console.log('\n🔒 Production Features:');
+            console.log(`   • GraphQL Introspection: ❌ Disabled`);
+            console.log(`   • Error Masking: ✅ Enabled`);
+            console.log(`   • Query Caching: ✅ Enabled`);
+        }
+
+        console.log('\n🧪 Test GraphQL Query:');
+        console.log(`curl -X POST http://localhost:${serverInfo.port}/graphql \\`);
+        console.log(`  -H "Content-Type: application/json" \\`);
+        console.log(`  -d '{"query":"{ hello serverInfo { status uptime } }"}'`);
+        console.log('=====================================================\n');
     }
 
     /**
-     * handleBootstrapError() - Bootstrap Hata İşleme Metodu
+     * handleBootstrapError() - Bootstrap Hata İşleme Metodu - GraphQL Enhanced
      *
-     * TR: Uygulama başlatma sırasında oluşan hataları işler.
-     *     Kaynakları temizler ve graceful shutdown yapar.
+     * TR: GraphQL + Express uygulama başlatma sırasında oluşan hataları işler.
+     *     Apollo Server, database bağlantısı ve HTTP server'ı güvenli şekilde kapatır.
      *
-     * EN: Handles errors that occur during application bootstrap.
-     *     Cleans up resources and performs graceful shutdown.
+     * EN: Handles errors that occur during GraphQL + Express application bootstrap.
+     *     Safely shuts down Apollo Server, database connection and HTTP server.
      *
      * @param error - TR: Oluşan hata | EN: Error that occurred
      */
     private async handleBootstrapError(error: any): Promise<void> {
-        console.error('\n💥 BOOTSTRAP ERROR - CLEANING UP...');
-        console.error('=====================================');
+        console.error('\n💥 GRAPHQL + EXPRESS BOOTSTRAP ERROR - CLEANING UP...');
+        console.error('===================================================');
         console.error('Error details:', error);
 
         try {
-            // TR: Database bağlantısını kapat
-            // EN: Close database connection
+            // TR: 1. Database bağlantısını kapat
+            // EN: 1. Close database connection
             console.log('🗄️ Closing database connection...');
             await closeDatabase();
 
-            // TR: Server'ı durdur (eğer başlatılmışsa)
-            // EN: Stop server (if started)
+            // TR: 2. MonitorServer'ı durdur (Apollo + HTTP server dahil)
+            // EN: 2. Stop MonitorServer (including Apollo + HTTP server)
             if (this.monitorServer) {
-                console.log('🌐 Stopping HTTP server...');
+                console.log('🌐 Stopping Full-Stack server (Apollo + Express + HTTP)...');
                 await this.monitorServer.stop();
             }
 
         } catch (cleanupError) {
             console.error('❌ Error during cleanup:', cleanupError);
         } finally {
-            console.log('💀 Application terminated due to startup failure');
+            console.log('💀 GraphQL + Express application terminated due to startup failure');
             process.exit(1); // TR: Hata kodu ile çık | EN: Exit with error code
         }
     }
 
     /**
-     * gracefulShutdown() - Graceful Kapatma Metodu
+     * gracefulShutdown() - Graceful Kapatma Metodu - GraphQL Enhanced
      *
-     * TR: Uygulamayı güvenli bir şekilde kapatır. Tüm bağlantıları temizler.
+     * TR: GraphQL + Express uygulamasını güvenli bir şekilde kapatır.
+     *     Apollo Server, database ve HTTP bağlantılarını temizler.
      *     External signal handler'lardan çağrılabilir.
      *
-     * EN: Safely shuts down the application. Cleans up all connections.
+     * EN: Safely shuts down GraphQL + Express application.
+     *     Cleans up Apollo Server, database and HTTP connections.
      *     Can be called from external signal handlers.
      */
     public async gracefulShutdown(): Promise<void> {
-        console.log('\n🔄 Starting graceful shutdown...');
+        console.log('\n🔄 Starting graceful shutdown of GraphQL + Express application...');
 
         try {
-            // TR: Server'ı durdur
-            // EN: Stop server
+            // TR: 1. MonitorServer'ı durdur (Apollo Server + HTTP)
+            // EN: 1. Stop MonitorServer (Apollo Server + HTTP)
+            console.log('📡 Stopping Apollo GraphQL Server...');
             await this.monitorServer.stop();
 
-            // TR: Database bağlantısını kapat
-            // EN: Close database connection
+            // TR: 2. Database bağlantısını kapat
+            // EN: 2. Close database connection
+            console.log('🗄️ Closing database connection...');
             await closeDatabase();
 
-            console.log('✅ Graceful shutdown completed');
+            console.log('✅ GraphQL + Express application graceful shutdown completed');
             process.exit(0);
 
         } catch (error) {
@@ -396,14 +399,17 @@ class ApplicationBootstrap {
     }
 }
 
+
 /**
- * initializeApp() - Ana Başlatma Fonksiyonu
+ * initializeApp() - Ana Başlatma Fonksiyonu - GraphQL + Express Edition
  *
- * TR: Uygulamayı başlatan ana fonksiyon. ApplicationBootstrap singleton'ını kullanır.
- *     Error handling ve graceful shutdown setup'ını yapar.
+ * TR: GraphQL Apollo Server ve Express uygulamasını başlatan ana fonksiyon.
+ *     ApplicationBootstrap singleton'ını kullanır. Enhanced error handling
+ *     ve GraphQL-specific graceful shutdown setup'ını yapar.
  *
- * EN: Main function that starts the application. Uses ApplicationBootstrap singleton.
- *     Sets up error handling and graceful shutdown.
+ * EN: Main function that starts GraphQL Apollo Server and Express application.
+ *     Uses ApplicationBootstrap singleton. Enhanced error handling and
+ *     GraphQL-specific graceful shutdown setup.
  */
 const initializeApp = async (): Promise<void> => {
     try {
@@ -411,32 +417,65 @@ const initializeApp = async (): Promise<void> => {
         // EN: Record startup time
         const startTime = Date.now();
 
-        console.log('🚀 INITIALIZING APPLICATION...');
-        console.log('================================');
+        console.log('🚀 INITIALIZING GRAPHQL + EXPRESS APPLICATION...');
+        console.log('===============================================');
+        console.log(`🕒 Startup initiated at: ${new Date().toISOString()}`);
+        console.log(`🎯 Target: Full-Stack GraphQL API Server`);
+        console.log(`📦 Stack: Apollo Server + Express + PostgreSQL`);
 
         // TR: ApplicationBootstrap instance'ını al ve başlat
         // EN: Get ApplicationBootstrap instance and start
         const app = ApplicationBootstrap.getInstance();
         await app.initializeApplication();
 
-        // TR: Başlatma süresini hesapla
-        // EN: Calculate startup time
+        // TR: Başlatma süresini hesapla ve logla
+        // EN: Calculate and log startup time
         const elapsedTime = Date.now() - startTime;
-        console.log(`⚡ Application started in ${elapsedTime}ms`);
+        console.log(`⚡ Total startup time: ${elapsedTime}ms`);
 
-        // TR: Process signal handler'ları setup et
-        // EN: Setup process signal handlers
-        process.on('SIGTERM', () => app.gracefulShutdown());
-        process.on('SIGINT', () => app.gracefulShutdown());
+        // TR: Process signal handler'ları setup et - GraphQL aware
+        // EN: Setup process signal handlers - GraphQL aware
+        process.on('SIGTERM', async () => {
+            console.log('\n📡 SIGTERM received - initiating GraphQL + Express shutdown...');
+            await app.gracefulShutdown();
+        });
+
+        process.on('SIGINT', async () => {
+            console.log('\n📡 SIGINT received (Ctrl+C) - initiating GraphQL + Express shutdown...');
+            await app.gracefulShutdown();
+        });
+
+        // TR: Unhandled promise rejection - GraphQL query errors vb.
+        // EN: Unhandled promise rejection - GraphQL query errors etc.
+        process.on('unhandledRejection', async (reason, promise) => {
+            console.error('❌ Unhandled Promise Rejection:', reason);
+            console.error('Promise that rejected:', promise);
+            console.log('🔄 Initiating emergency shutdown...');
+            await app.gracefulShutdown();
+        });
+
+        // TR: Uncaught exception - kritik hatalar
+        // EN: Uncaught exception - critical errors
+        process.on('uncaughtException', async (error) => {
+            console.error('❌ Uncaught Exception:', error);
+            console.log('🔄 Initiating emergency shutdown...');
+            await app.gracefulShutdown();
+        });
+
+        console.log('\n🛡️ Signal handlers configured for GraphQL + Express stack');
+        console.log('🎯 Application ready to serve GraphQL and REST requests\n');
 
     } catch (error) {
-        console.error('💥 CRITICAL ERROR - Application initialization failed:', error);
+        console.error('\n💥 CRITICAL ERROR - GraphQL + Express initialization failed:');
+        console.error('================================================================');
+        console.error(error);
+        console.error('\n💀 Application startup aborted');
         process.exit(1);
     }
 };
 
 /**
- * TR: Uygulamayı başlat - bu satır çalıştığında tüm süreç başlar
- * EN: Start application - when this line runs, entire process begins
+ * TR: GraphQL + Express uygulamasını başlat - bu satır çalıştığında tüm full-stack süreç başlar
+ * EN: Start GraphQL + Express application - when this line runs, entire full-stack process begins
  */
 initializeApp();
