@@ -14,8 +14,9 @@
 import express, { Express } from 'express';
 import MonitorServer from './server/server';
 import { config, validateConfig } from './server/config';
-import { connectDatabase, syncDatabase, closeDatabase } from './server/database';
+import { connectDatabase, closeDatabase } from './server/database';
 import logger from './server/logger';
+import {initializeModels} from "@app/models/initialize";
 
 /**
  * ApplicationBootstrap Sınıfı - GraphQL + Express Integration
@@ -195,15 +196,9 @@ class ApplicationBootstrap {
             // EN: Test database connection
             await connectDatabase();
 
-            // TR: GraphQL için model synchronization
-            // EN: Model synchronization for GraphQL
-            if (config.isDevelopment) {
-                logger.info('🔄 Synchronizing database models for GraphQL (development mode)...');
-                await syncDatabase({ alter: true });
-            } else if (config.NODE_ENV === 'production') {
-                logger.info('🔒 Running safe database sync for production GraphQL...');
-                await syncDatabase({ alter: false, force: false });
-            }
+            // TR: 2. Model'leri initialize et (association'lar dahil)
+            // EN: 2. Initialize models (including associations)
+            await initializeModels();
 
             logger.info('✅ Database setup completed for GraphQL resolvers');
 
